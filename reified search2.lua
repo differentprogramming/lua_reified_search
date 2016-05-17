@@ -255,10 +255,10 @@ local noun_phrase
 local function verb(c,search,X,Y,Z)
   local O = Logical:new()
   local function rest()
-    return unify(c,search,list{X,Y,Z},list{{plays,with,Dot,O},O,{v,plays,with}})
+    return unify(c,search,list{X,Y,Z},list{{'plays','with',Dot,O},O,{'v','plays','with'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{eats,Dot,O},O,{v,eats}})
+  return unify(rest,search,list{X,Y,Z},list{{'eats',Dot,O},O,{'v','eats'}})
   
 end
 
@@ -266,20 +266,20 @@ end
 local function noun(c,search,X,Y,Z)
   local O = Logical:new()
   local function rest()
-    return unify(c,search,list{X,Y,Z},list{{cat,Dot,O},O,{n,cat}})
+    return unify(c,search,list{X,Y,Z},list{{'cat',Dot,O},O,{'n','cat'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{bat,Dot,O},O,{n,bat}})
+  return unify(rest,search,list{X,Y,Z},list{{'bat',Dot,O},O,{'n','bat'}})
   
 end
 
 local function det(c,search,X,Y,Z)
   local O = Logical:new()
   local function rest()
-    return unify(c,search,list{X,Y,Z},list{{a,Dot,O},O,{d,a}})
+    return unify(c,search,list{X,Y,Z},list{{'a',Dot,O},O,{'d','a'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{the,Dot,O},O,{d,the}})  
+  return unify(rest,search,list{X,Y,Z},list{{'the',Dot,O},O,{'d','the'}})  
 end
 local function verb_phrase(c,search,X,Y,Z)
   local A=Logical:new()
@@ -293,7 +293,7 @@ local function verb_phrase(c,search,X,Y,Z)
     end
     return verb(rest2,search,A,C,V)
   end
-  return unify(rest,search,list{X,Y,Z},list{A,B,{vp,NP,N}})
+  return unify(rest,search,list{X,Y,Z},list{A,B,{'vp',NP,N}})
 end
 
 noun_phrase= function (c,search,X,Y,Z)
@@ -308,7 +308,7 @@ noun_phrase= function (c,search,X,Y,Z)
     end
     return det(rest2,search,A,C,D)
   end
-  return unify(rest,search,list{X,Y,Z},list{A,B,{np,D,N}})
+  return unify(rest,search,list{X,Y,Z},list{A,B,{'np',D,N}})
 end
 local function sentence (c,search,X,Y,Z)
   local A=Logical:new()
@@ -322,7 +322,7 @@ local function sentence (c,search,X,Y,Z)
     end
     return noun_phrase(rest2,search,A,C,NP)
   end
-  return unify(rest,search,list{X,Y,Z},list{A,B,{s,NP,VP}})
+  return unify(rest,search,list{X,Y,Z},list{A,B,{'s',NP,VP}})
 end
 
 
@@ -340,6 +340,9 @@ end
 
 
 local search = new_search(sentence,rest1,X,Y,Z)
+
+--local search = new_search(unify,rest1,list{'cat',Dot,'dog'},list{X,Dot,Y})
+
 repeat
   l = search()
    print (N,M)
