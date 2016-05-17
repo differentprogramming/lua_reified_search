@@ -1,9 +1,11 @@
 local list,listp,nullp,car,cdr,pairp
 
 local function amb_next(amb_list,n)
+  assert(amb_list.class_name == 'AmbList')
     table.insert(amb_list,n)
 end
 local function amb(amb_list)
+  assert(amb_list.class_name == 'AmbList')
   return table.remove(amb_list)()
 end
 
@@ -14,7 +16,7 @@ local function new_amblist()
    amb_next(amb_list,fail)
    return nil
   end
-  amb_list = { fail }
+  amb_list = { class_name='AmbList',fail }
   return amb_list
 end
 
@@ -156,18 +158,18 @@ end
 local Cons = { class_name='Cons'   }
 
 function Cons:rest_tostring()
-        if (nullp(self[2])) then return ' ' .. tostring(self[1]) .. ' )'
-        elseif (listp(self[2])) then return ' ' .. tostring(self[1]) .. self[2]:rest_tostring()
-        else return ' ' .. tostring(self[1]) .. ' . ' .. tostring(self[2]) ..' )'
+        if (nullp(logical_get(self[2]))) then return ' ' .. tostring(logical_get(self[1])) .. ' )'
+        elseif (listp(logical_get(self[2]))) then return ' ' .. tostring(logical_get(self[1])) .. logical_get(self[2]):rest_tostring()
+        else return ' ' .. tostring(logical_get(self[1])) .. ' . ' .. tostring(self[2]) ..' )'
         end
 end
 
 local Cons_meta={ 
   __tostring=function (self)  
         if nullp(self) then return '()'
-        elseif nullp(self[2]) then return '( ' .. tostring(self[1]) .. ' )'
-        elseif listp(self[2]) then return '( ' .. tostring(self[1]) .. self[2]:rest_tostring()
-        else return '( ' .. tostring(self[1]) .. ' . ' .. tostring(self[2]) ..' )'
+        elseif nullp(logical_get(self[2])) then return '( ' .. tostring(logical_get(self[1])) .. ' )'
+        elseif listp(logical_get(self[2])) then return '( ' .. tostring(logical_get(self[1])) .. logical_get(self[2]):rest_tostring()
+        else return '( ' .. tostring(logical_get(self[1])) .. ' . ' .. tostring(self[2]) ..' )'
         end
 end,
     
@@ -227,13 +229,14 @@ local function new_search(fn,C,...)
   local function search_doit(self)
     self.doit=search_continue
     amb_list.failed=nil
-    return fn(C, self,table.unpack(rest,1,rest.n))  
+    return fn(C, amb_list,table.unpack(rest,1,rest.n))  
   end 
   
   return setmetatable({ 
    doit=search_doit,
    reset = function(self) self.doit=search_doit end,
-   failed=function() return amb_list.failed end
+   failed=function() return amb_list.failed end,
+   
    },{ __call=function(self) return self:doit() end,
    }) 
 end
@@ -258,7 +261,7 @@ local function verb(c,search,X,Y,Z)
     return unify(c,search,list{X,Y,Z},list{{'plays','with',Dot,O},O,{'v','plays','with'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{'eats',Dot,O},O,{'v','eats'}})
+  return unify(c,search,list{X,Y,Z},list{{'eats',Dot,O},O,{'v','eats'}})
   
 end
 
@@ -269,7 +272,7 @@ local function noun(c,search,X,Y,Z)
     return unify(c,search,list{X,Y,Z},list{{'cat',Dot,O},O,{'n','cat'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{'bat',Dot,O},O,{'n','bat'}})
+  return unify(c,search,list{X,Y,Z},list{{'bat',Dot,O},O,{'n','bat'}})
   
 end
 
@@ -279,7 +282,7 @@ local function det(c,search,X,Y,Z)
     return unify(c,search,list{X,Y,Z},list{{'a',Dot,O},O,{'d','a'}})
   end
   amb_next(search,rest)
-  return unify(rest,search,list{X,Y,Z},list{{'the',Dot,O},O,{'d','the'}})  
+  return unify(c,search,list{X,Y,Z},list{{'the',Dot,O},O,{'d','the'}})  
 end
 local function verb_phrase(c,search,X,Y,Z)
   local A=Logical:new()
@@ -335,7 +338,7 @@ Z=Logical:new()
 
 function rest1(search)
   print('parse =',X,Y,Z)
-  return not search.failed()
+  return not search.failed
 end
 
 
