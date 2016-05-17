@@ -207,6 +207,7 @@ end
 local Logical = { class_name='logical'   }
 local Logical_meta={ 
   __tostring=function (self) 
+      if ground(self) then return tostring(logical_get(self)) end
       local n=logical_get(self)
       if n==Unistanciated then return 'Var'..("%p"):format(self) end
       return 'Var'..("%p"):format(self)..':'..tostring(n) 
@@ -348,10 +349,10 @@ local search = new_search(sentence,rest1,X,Y,Z)
 
 repeat
   l = search()
-   print (N,M)
+ --  print (N,M)
 until not l
 search:reset()
 repeat
   l = search()
-   print (N,M) 
+ --  print (N,M) 
 until not l
