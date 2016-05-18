@@ -1,26 +1,50 @@
 local list,listp,nullp,car,cdr,pairp
 
-local function amb_next(amb_list,n)
+local function save_undo(amb_list,n)
   assert(amb_list.class_name == 'AmbList')
     table.insert(amb_list,n)
+    table.insert(amb_list,'undo')
 end
-local function amb(amb_list)
+local function alt(amb_list,n)
   assert(amb_list.class_name == 'AmbList')
+    table.insert(amb_list,n)
+    table.insert(amb_list,'alt')
+end
+
+
+local function fail(amb_list)
+  assert(amb_list.class_name == 'AmbList')
+  table.remove(amb_list)
   return table.remove(amb_list)()
+end
+
+local function snip_start(amb_list)
+  return #amb_list
+end
+local function snip(amb_list,snip_pos)
+  local n={}
+  while #amb_list>snip do
+    if table.remove(amb_list) == 'undo' then
+      table.insert(n,table.remove(amb_list))
+    else
+      table.remove(amb_list)
+    end
+  end
+  while #n do table.insert(amb_list,table.remove(n)) table.insert(amb_list,'undo') end
 end
 
 local function new_amblist()
   local amb_list
   local function fail()
    amb_list.failed=true
-   amb_next(amb_list,fail)
+   save_undo(amb_list,fail)
    return nil
   end
-  amb_list = { class_name='AmbList',fail }
+  amb_list = { class_name='AmbList',fail,'undo' }
   return amb_list
 end
 
-local Unistanciated= { class_name='uninstanciated_singleton' }
+local Uninstanciated= { class_name='uninstanciated_singleton' }
 local Dot = { class_name='dot_singleton' }
 local Null = { class_name='Cons' }
 
@@ -44,7 +68,7 @@ end
 
 
 
---follow the chain of logical unifications to the end, Unistanciated is a possible result
+--follow the chain of logical unifications to the end, Uninstanciated is a possible result
 --for a logical returns the target as well (ie value,target)
 --if not logical then returns original unchanged
 local function logical_get(a)
@@ -62,7 +86,7 @@ local function logical_get(a)
 end
 
 local function ground(n) 
-  return logical_get(n)~=Unistanciated 
+  return logical_get(n)~=Uninstanciated 
 end
 
 
@@ -77,7 +101,7 @@ local _predicate_unify
 local function unify(C,search,a,b)
   if a==b then return C(search,true) end
   if listp(a) and listp(b) then 
-    if not _predicate_unify(search,a,b) then return amb(search) end
+    if not _predicate_unify(search,a,b) then return fail(search) end
     return C(search,true)
   end 
   if is_logical(b) then a,b=b,a end
@@ -85,20 +109,20 @@ local function unify(C,search,a,b)
     local a_value,a_target = logical_get(a)
     local b_value,b_target = logical_get(b)
     if a_value==b_value then
-      if a_value==Unistanciated then
+      if a_value==Uninstanciated then
         if a_target == b_target then return true end
         local restore_a = a_target.value
         a_target.value = b_target
-        amb_next(search,function () a_target.value = restore_a return amb(search) end)
+        save_undo(search,function () a_target.value = restore_a return fail(search) end)
         return C(search,true)
       else
         return C(search,true)
       end
-    elseif b_value==Unistanciated then a_value,a_target,b_value,b_target = b_value,b_target,a_value,a_target end
-    if a_value==Unistanciated then
+    elseif b_value==Uninstanciated then a_value,a_target,b_value,b_target = b_value,b_target,a_value,a_target end
+    if a_value==Uninstanciated then
       local restore_a = a_target.value
       a_target.value = b_value
-      amb_next(search,function () a_target.value = restore_a return amb(search) end)
+      save_undo(search,function () a_target.value = restore_a return fail(search) end)
       return C(search,true)
     end
   end
@@ -109,27 +133,27 @@ end
 --recursively destructure
 --oops have to redo it so lists and dot work
 _predicate_unify=function(search,a,b)
-  local function null_amb() return amb(search) end
+  local function null_amb() return fail(search) end
   if a==b then return true end
   if is_logical(b) then a,b=b,a end
   if is_logical(a) then
     local a_value,a_target = logical_get(a)
     local b_value,b_target = logical_get(b)
     if a_value==b_value then
-      if a_value==Unistanciated then
+      if a_value==Uninstanciated then
         if a_target == b_target then return true end
         local restore_a = a_target.value
         a_target.value = b_target
-        amb_next(search,function () a_target.value = restore_a return amb(search) end)
+        save_undo(search,function () a_target.value = restore_a return fail(search) end)
         return true
       else
         return true
       end
-    elseif b_value==Unistanciated then a_value,a_target,b_value,b_target = b_value,b_target,a_value,a_target end
-    if a_value==Unistanciated then
+    elseif b_value==Uninstanciated then a_value,a_target,b_value,b_target = b_value,b_target,a_value,a_target end
+    if a_value==Uninstanciated then
       local restore_a = a_target.value
       a_target.value = b_value
-      amb_next(search,function () a_target.value = restore_a return amb(search) end)
+      save_undo(search,function () a_target.value = restore_a return fail(search) end)
       return true
     end
   end
@@ -204,18 +228,18 @@ list=function (t)
 end
 
 
-local Logical = { class_name='logical'   }
-local Logical_meta={ 
+local LV = setmetatable({ class_name='logical'   },{__call=function(self,n) return self:new(n) end})
+local LV_meta={ 
   __tostring=function (self) 
       if ground(self) then return tostring(logical_get(self)) end
       local n=logical_get(self)
-      if n==Unistanciated then return 'Var'..("%p"):format(self) end
+      if n==Uninstanciated then return 'Var'..("%p"):format(self) end
       return 'Var'..("%p"):format(self)..':'..tostring(n) 
     end,
-  __index = Logical
+  __index = LV,
   }
-function Logical:new(n) 
-  return setmetatable({value=n or Unistanciated},Logical_meta) 
+function LV(n) 
+  return setmetatable({value=n or Uninstanciated},LV_meta) 
 end
 
 
@@ -224,7 +248,7 @@ local function new_search(fn,C,...)
   rest = table.pack(...)
   
   local function search_continue(self)
-    return amb(amb_list)
+    return fail(amb_list)
   end
 
   local function search_doit(self)
@@ -256,41 +280,52 @@ end
 
 local noun_phrase
 
+-- verb([eats|O],O,v(eats)).
+-- verb([plays with|O],O,v(eats)).
 local function verb(c,search,X,Y,Z)
-  local O = Logical:new()
+  local O = LV()
   local function rest()
     return unify(c,search,list{X,Y,Z},list{{'plays','with',Dot,O},O,{'v','plays','with'}})
   end
-  amb_next(search,rest)
+  alt(search,rest)
   return unify(c,search,list{X,Y,Z},list{{'eats',Dot,O},O,{'v','eats'}})
   
 end
 
+-- noun([bat|O],O,n(bat)).
+-- noun([cat|O],O,n(cat)).
 
 local function noun(c,search,X,Y,Z)
-  local O = Logical:new()
+  local O = LV()
   local function rest()
     return unify(c,search,list{X,Y,Z},list{{'cat',Dot,O},O,{'n','cat'}})
   end
-  amb_next(search,rest)
+  alt(search,rest)
   return unify(c,search,list{X,Y,Z},list{{'bat',Dot,O},O,{'n','bat'}})
   
 end
 
+local function LVars(n)
+  if n==1 then 
+    return LV() 
+  end
+  return LV(),LVars(n-1)
+end
+
+-- det([the|O],O,d(the)).
+-- det([a|O],O,d(a)).
 local function det(c,search,X,Y,Z)
-  local O = Logical:new()
+  local O = LV()
   local function rest()
     return unify(c,search,list{X,Y,Z},list{{'a',Dot,O},O,{'d','a'}})
   end
-  amb_next(search,rest)
+  alt(search,rest)
   return unify(c,search,list{X,Y,Z},list{{'the',Dot,O},O,{'d','the'}})  
 end
+
+-- verb_phrase(A,B,vp(V,NP)):- verb(A,C,V), noun_phrase(C,B,NP).
 local function verb_phrase(c,search,X,Y,Z)
-  local A=Logical:new()
-  local B=Logical:new()
-  local V=Logical:new()
-  local NP=Logical:new()
-  local C=Logical:new()
+  local A,B,V,NP,C=LVars(5)
   local function rest()
     local function rest2()
       return noun_phrase(c,search,C,B,NP)
@@ -300,12 +335,9 @@ local function verb_phrase(c,search,X,Y,Z)
   return unify(rest,search,list{X,Y,Z},list{A,B,{'vp',NP,N}})
 end
 
+-- noun_phrase(A,B,np(D,N)) :- det(A,C,D), noun(C,B,N).
 noun_phrase= function (c,search,X,Y,Z)
-  local A=Logical:new()
-  local B=Logical:new()
-  local D=Logical:new()
-  local N=Logical:new()
-  local C=Logical:new()
+  local A,B,D,N,C=LVars(5)
   local function rest()
     local function rest2()
       return noun(c,search,C,B,N)
@@ -314,12 +346,10 @@ noun_phrase= function (c,search,X,Y,Z)
   end
   return unify(rest,search,list{X,Y,Z},list{A,B,{'np',D,N}})
 end
+
+-- sentence(A,B,s(NP,VP)) :- noun_phrase(A,C,NP), verb_phrase(C,B,VP).
 local function sentence (c,search,X,Y,Z)
-  local A=Logical:new()
-  local B=Logical:new()
-  local NP=Logical:new()
-  local VP=Logical:new()
-  local C=Logical:new()
+  local A,B,NP,VP,C=LVars(5)
   local function rest()
     local function rest2()
       return verb_phrase(c,search,C,B,VP)
@@ -329,13 +359,10 @@ local function sentence (c,search,X,Y,Z)
   return unify(rest,search,list{X,Y,Z},list{A,B,{'s',NP,VP}})
 end
 
-
 print(list{'A','B',Dot,'C'})
-print(list{'A',{'B','C'},Logical:new(5)})
+print(list{'A',{'B','C'},LV(5)})
 
-X=Logical:new()
-Y=Logical:new()
-Z=Logical:new()
+X,Y,Z=LVars(3)
 
 function rest1(search)
   print('parse =',X,Y,Z)
