@@ -1,16 +1,16 @@
 
 
 
-function amb_next(amb_list,n)
+local function amb_next(amb_list,n)
     table.insert(amb_list,n)
 end
-function amb(amb_list)
+local function amb(amb_list)
   return table.remove(amb_list)()
 end
 
-function new_amblist()
+local function new_amblist()
   local amb_list
-  fail= function ()
+  local function fail ()
 --    print 'failed'
     return amb_next(amb_list,fail)
   end
