@@ -182,9 +182,6 @@ end
 
 local function not_identical(C,search,a,b)
   if _identical(a,b) then return fail(search) end
-  if tostring(a)==tostring(b) then
-    _identical(a,b)
-  end
   return C(search)
 end
 
