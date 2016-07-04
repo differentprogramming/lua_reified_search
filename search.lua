@@ -248,18 +248,18 @@ local function inc_lv_counter()
   LV_COUNTER=LV_COUNTER+1
   return LV_COUNTER
 end
-local LV = setmetatable({ class_name='logical', number=inc_lv_counter  },{__call=function(self,n) return self:new(n) end})
+local LV = setmetatable({ class_name='logical'  },{__call=function(self,n) return self:new(n) end})
 local LV_meta={ 
   __tostring=function (self) 
       if ground(self) then return tostring(logical_get(self)) end
       local n=logical_get(self)
-      if n==Uninstanciated then return 'Var'..self.number() end
+      if n==Uninstanciated then return 'Var'..self.number end
       return 'Var'..("%p"):format(self)..':'..tostring(n) 
     end,
   __index = LV,
   }
 function LV(n) 
-  return setmetatable({value=n or Uninstanciated},LV_meta) 
+  return setmetatable({number = inc_lv_counter(),value=n or Uninstanciated},LV_meta) 
 end
 
 
