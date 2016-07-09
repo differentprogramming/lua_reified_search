@@ -263,6 +263,7 @@ function LV(n)
 end
 
 
+
 local function new_search(fn,C,...)
   local amb_list=new_amblist()
   rest = table.pack(...)
@@ -293,8 +294,26 @@ local function LVars(n)
   return LV(),LVars(n-1)
 end
 
+local function apply_dynamic(self,c,search,...)
+  local snip_pos = snip_start(search)
+  local current_predicate = 0
+  local extras = table.pack(...)
+  local function next() 
+    current_predicate=current_predicate+1
+    if not self[current_predicate] then return fail(search) end
+    alt(search,next)
+    return self[current_predicate](snip_pos,c,search,table.unpack(extras))
+  end
+  return next()
+end 
+
+local function dynamic()
+  return setmetatable({},{__call= apply_dynamic})
+end
+
 
 local Search = {
+  dynamic=dynamic,
 	save_undo=save_undo,
 	alt=alt,
 	fail=fail,
