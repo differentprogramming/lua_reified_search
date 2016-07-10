@@ -296,23 +296,50 @@ end
 
 local function apply_dynamic(self,c,search,...)
   local snip_pos = snip_start(search)
-  local current_predicate = 0
+  local current_predicate = self[1]
   local extras = table.pack(...)
   local function next() 
-    current_predicate=current_predicate+1
-    if not self[current_predicate] then return fail(search) end
+    if nullp(current_predicate) then return fail(search) end
     alt(search,next)
-    return self[current_predicate](snip_pos,c,search,table.unpack(extras))
+    local f=car(current_predicate)
+    current_predicate=cdr(current_predicate)
+    if type(f) == 'function' then
+      return f(snip_pos,c,search,table.unpack(extras))
+    end
+    return unify(c,search,f,extras[1])
   end
   return next()
 end 
 
 local function dynamic()
-  return setmetatable({},{__call= apply_dynamic})
+  return setmetatable({Null,Null},{__call= apply_dynamic})
+end
+
+local function assertz(d,f)
+  if d[2]==Null then d[1]=Cons:new(f) d[2]=d[1] else
+    d[2][2]=Cons:new(f) 
+    d[2]=d[2][2]
+  end
+  return d[2]
+end
+
+local function asserta(d,f)
+  if d[1]==Null then d[1]=Cons:new(f) d[2]=d[1] else
+    d[1]=Cons:new(f,d[1]) 
+  end
+  return d[1]
+end
+
+local function retract_all(d)
+  d[1]=Null
+  d[2]=Null
 end
 
 
 local Search = {
+  retract_all=retract_all,
+  asserta=asserta,
+  assertz=assertz,
   dynamic=dynamic,
 	save_undo=save_undo,
 	alt=alt,

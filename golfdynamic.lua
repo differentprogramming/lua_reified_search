@@ -28,7 +28,9 @@ local   _identical= Search._identical
 local   not_identical= Search.not_identical
 local   LVars=Search.LVars
 local   dynamic=Search.dynamic
-
+local   assertz=Search.assertz
+local   asserta=Search.asserta
+local   retract_all=Search.retract_all
 --/*24*/ condition_1(_,C1,_,_,_,_,_,_) :-
 --/*25*/ C1 = red,!.
 --/*26*/ condition_1(_,_,_,C2,_,_,_,_) :-
@@ -83,31 +85,23 @@ end
 --/*48*/ color(blue).
 --/*49*/ color(red).
 --/*50*/ color(plaid).
-local function color(c, search, C)
-  local function r50()
-    return unify(c,search,C,'plaid')
-  end
-  local function r49()
-    alt(search,r50)
-    return unify(c,search,C,'red')
-  end
-  local function r48()
-    alt(search,r49)
-    return unify(c,search,C,'blue')
-  end
-  alt(search,r48)
-  return unify(c,search,C,'orange')
-end
+
+local color = dynamic();
+asserta(color,'plaid')
+asserta(color,'red')
+asserta(color,'blue')
+asserta(color,function(s,c,search,C) return unify(c,search,C,'orange') end )
+
 --/*51*/ position(1).
 --/*52*/ position(2).
 --/*53*/ position(3).
 --/*54*/ position(4).
 
 local position = dynamic()
-table.insert(position, function(s,c,search,C) return unify(c,search,C,1) end )
-table.insert(position, function(s,c,search,C) return unify(c,search,C,2) end )
-table.insert(position, function(s,c,search,C) return unify(c,search,C,3) end )
-table.insert(position, function(s,c,search,C) return unify(c,search,C,4) end )
+assertz(position, 1 )
+assertz(position, function(s,c,search,C) return unify(c,search,C,2) end )
+assertz(position, function(s,c,search,C) return unify(c,search,C,3) end )
+assertz(position, function(s,c,search,C) return unify(c,search,C,4) end )
 
 
 --/*21*/ conditions(Number,_,Color) :-
