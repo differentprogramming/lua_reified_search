@@ -1,5 +1,13 @@
 local list,listp,nullp,car,cdr,pairp
 
+local function class_of(obj)
+    local c=type(obj)
+    if c=='table' and obj.class_name then
+        return obj.class_name 
+    end
+    return c
+end
+
 local function save_undo(amb_list,n)
   assert(amb_list.class_name == 'AmbList')
     table.insert(amb_list,n)
@@ -56,15 +64,6 @@ Null[2]=Null
 setmetatable(Null,{__tostring=function() return '()' end})
 
 
-local function class_of(obj)
-    local c=type(obj)
-    if c=='table' and obj.class_name then
-        return obj.class_name 
-    end
-    return c
-end
-
-
 local function is_logical(v)
   return type(v)=='table' and v.class_name=='logical'
 end
@@ -88,6 +87,13 @@ local function logical_get(a)
   return a
 end
 
+local function logical_set(l,v)
+  local _,t = logical_get(l)
+  assert(t)
+  t.value = v
+  return v
+end
+
 local function ground(n) 
   return logical_get(n)~=Uninstanciated 
 end
@@ -101,20 +107,34 @@ end
 
 local _predicate_unify
 
-local function unify(C,search,a,b)
-  if not _predicate_unify(search,a,b) then return fail(search) end
+local function unify(C,search,a,b,match_table)
+  if not _predicate_unify(search,a,b,match_table) then return fail(search) end
   return C(search)
 end
 
 
 --recursively destructure
-_predicate_unify=function(search,a,b)
-  if a==b then return true end
+_predicate_unify=function(search,a,b,match_table)
+  local function filter(v)
+    if match_table and match_table[class_of(v)] then 
+      return match_table[class_of(v)](v)
+    end
+    return v
+  end
+    
+  if class_of(a)=='table' then a=list(a) end
+  if class_of(b)=='table' then b=list(b) end
+
+  if filter(a)==filter(b) then return true end
   if is_logical(b) then a,b=b,a end
+  local a_value=a;
+  local b_value=b;
+  
   if is_logical(a) then
-    local a_value,a_target = logical_get(a)
-    local b_value,b_target = logical_get(b)
-    if a_value==b_value then
+    local a_target,b_target
+    a_value,a_target = logical_get(a)
+    b_value,b_target = logical_get(b)
+    if filter(a_value)==filter(b_value) then
       if a_value==Uninstanciated then
         if a_target == b_target then return true end
         local restore_a = a_target.value
@@ -133,13 +153,10 @@ _predicate_unify=function(search,a,b)
     end
   end
   
-  
-  if class_of(a)=='table' then a=list(a) end
-  if class_of(b)=='table' then b=list(b) end
-  
-  if pairp(a) and pairp(b) then
-    if not _predicate_unify(search,car(a),car(b)) then return false end
-    return _predicate_unify(search,cdr(a),cdr(b))    
+    
+  if pairp(a_value) and pairp(b_value) then
+    if not _predicate_unify(search,car(a_value),car(b_value)) then return false end
+    return _predicate_unify(search,cdr(a_value),cdr(b_value))    
   end
   return false  
 end
@@ -149,9 +166,12 @@ function _identical(a,b)
   if is_logical(b) then 
     a,b=b,a 
   end
+  local a_value=a;
+  local b_value=b;
   if is_logical(a) then
-    local a_value,a_target = logical_get(a)
-    local b_value,b_target = logical_get(b)
+    local a_target,b_target
+    a_value,a_target = logical_get(a)
+    b_value,b_target = logical_get(b)
     if a_value==b_value then
       if a_value==Uninstanciated then
         if a_target == b_target then
@@ -164,7 +184,8 @@ function _identical(a,b)
     end
     return false
   end
-
+  a=a_value
+  b=b_value
   if class_of(a)=='table' then a=list(a) end
   if class_of(b)=='table' then b=list(b) end
   
@@ -197,19 +218,24 @@ end
 
 local Cons = { class_name='Cons'   }
 
+local open_paren = '「 '
+local close_paren = ' 」'
+local display_nil = '「」'
+local display_dot = ' | '
+
 function Cons:rest_tostring()
-        if (nullp(logical_get(self[2]))) then return ' ' .. tostring(logical_get(self[1])) .. ' )'
+        if (nullp(logical_get(self[2]))) then return ' ' .. tostring(logical_get(self[1])) .. close_paren
         elseif (listp(logical_get(self[2]))) then return ' ' .. tostring(logical_get(self[1])) .. logical_get(self[2]):rest_tostring()
-        else return ' ' .. tostring(logical_get(self[1])) .. ' . ' .. tostring(self[2]) ..' )'
+        else return ' ' .. tostring(logical_get(self[1])) .. display_dot .. tostring(logical_get(self[2])) ..close_paren
         end
 end
 
 local Cons_meta={ 
   __tostring=function (self)  
-        if nullp(self) then return '()'
-        elseif nullp(logical_get(self[2])) then return '( ' .. tostring(logical_get(self[1])) .. ' )'
-        elseif listp(logical_get(self[2])) then return '( ' .. tostring(logical_get(self[1])) .. logical_get(self[2]):rest_tostring()
-        else return '( ' .. tostring(logical_get(self[1])) .. ' . ' .. tostring(self[2]) ..' )'
+        if nullp(self) then return display_nil
+        elseif nullp(logical_get(self[2])) then return open_paren .. tostring(logical_get(self[1])) .. close_paren
+        elseif listp(logical_get(self[2])) then return open_paren .. tostring(logical_get(self[1])) .. logical_get(self[2]):rest_tostring()
+        else return open_paren .. tostring(logical_get(self[1])) .. display_dot .. tostring(logical_get(self[2])) ..close_paren
         end
 end,
     
@@ -266,7 +292,7 @@ end
 
 local function new_search(fn,C,...)
   local amb_list=new_amblist()
-  rest = table.pack(...)
+  local rest = table.pack(...)
   
   local function search_continue(self)
     return fail(amb_list)
@@ -368,6 +394,7 @@ local Search = {
 	not_identical=not_identical,
   LVars=LVars,
 	_identical=_identical,
+  logical_set=logical_set,
 }
 
 return Search
